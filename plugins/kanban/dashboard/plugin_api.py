@@ -917,19 +917,49 @@ except ImportError:
     _psutil = None  # type: ignore[assignment]
 
 
+def _latest_run_events(conn: sqlite3.Connection, run_ids: list[int]) -> dict[int, dict]:
+    """Latest ``task_events`` row per *run_id* — ``{kind, created_at, note}``."""
+    if not run_ids:
+        return {}
+    ph = ",".join("?" * len(run_ids))
+    rows = conn.execute(
+        "SELECT e.run_id, e.kind, e.created_at, e.payload "
+        "FROM task_events e "
+        f"INNER JOIN (SELECT run_id, MAX(id) AS mid FROM task_events WHERE run_id IN ({ph}) GROUP BY run_id) g "
+        "ON e.id = g.mid", tuple(run_ids),
+    ).fetchall()
+    out: dict[int, dict] = {}
+    for r in rows:
+        note = None
+        if r["payload"]:
+            try:
+                note = json.loads(r["payload"]).get("note")
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        out[r["run_id"]] = {"kind": r["kind"], "created_at": r["created_at"], "note": note}
+    return out
+
+
 @router.get("/workers/active")
 def list_active_workers(board: Optional[str] = _BOARD_Q):
     """Every running worker: an open ``task_runs`` row with a ``worker_pid`` whose
-    task is ``running``. Returns ``{workers, count, checked_at}``."""
+    task is ``running``.  Returns ``{workers, count, checked_at}``.
+
+    Each worker carries ``step_key`` (the workflow phase, nullable) and
+    ``latest_event`` (``{kind, created_at, note}`` or null).
+    """
     with _board_conn(board) as (board, conn):
         rows = conn.execute(
             "SELECT r.id AS run_id, r.task_id, t.title AS task_title, t.status AS task_status, "
             "t.assignee AS task_assignee, r.profile, r.worker_pid, r.started_at, r.claim_lock, "
-            "r.claim_expires, r.last_heartbeat_at, r.max_runtime_seconds "
+            "r.claim_expires, r.last_heartbeat_at, r.max_runtime_seconds, r.step_key "
             "FROM task_runs r JOIN tasks t ON t.id = r.task_id "
             "WHERE r.ended_at IS NULL AND r.worker_pid IS NOT NULL AND t.status = 'running' "
             "ORDER BY r.started_at ASC").fetchall()
         workers = [dict(row) for row in rows]
+        events = _latest_run_events(conn, [w["run_id"] for w in workers])
+        for w in workers:
+            w["latest_event"] = events.get(w["run_id"])
         return {"workers": workers, "count": len(workers), "checked_at": int(time.time())}
 
 

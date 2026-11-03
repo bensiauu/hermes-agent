@@ -251,6 +251,35 @@ export const COLUMN_META: Record<string, { codicon: string; tone: string }> = {
 export const columnMeta = (name: string) =>
   COLUMN_META[name] ?? { codicon: 'circle-outline', tone: 'var(--ui-text-secondary)' }
 
+// ── active-worker status ────────────────────────────────────────────────────
+
+export interface ActiveWorkerEvent {
+  kind: string
+  created_at: number
+  note?: null | string
+}
+
+export interface ActiveWorker {
+  run_id: number
+  task_id: string
+  task_title: string
+  task_assignee?: null | string
+  profile?: null | string
+  started_at: number
+  last_heartbeat_at?: null | number
+  max_runtime_seconds?: null | number
+  /** Workflow phase — nullable, absent on older backends. */
+  step_key?: null | string
+  /** Most recent task_events row for this run — null when no events exist. */
+  latest_event?: null | ActiveWorkerEvent
+}
+
+export interface ActiveWorkersResponse {
+  workers: ActiveWorker[]
+  count: number
+  checked_at: number
+}
+
 export const SEVERITY_TONE: Record<Diagnostic['severity'], string> = {
   critical: 'var(--destructive, #f87171)',
   error: 'var(--destructive, #f87171)',

@@ -89,6 +89,7 @@ import { OrchestrationPanel } from './orchestration'
 import { columnMeta, type KanbanBoard, type KanbanTask, type TaskEstimate } from './types'
 import {
   $newTaskLane,
+  $openTaskId,
   ago,
   type ArcState,
   arcState,
@@ -1136,6 +1137,17 @@ export function KanbanBoardPage() {
     setAddStatus(requestedLane)
     $newTaskLane.set(null)
   }, [requestedLane])
+
+  const requestedTaskId = useValue($openTaskId)
+
+  useEffect(() => {
+    if (requestedTaskId === null) {
+      return
+    }
+
+    setOpenId(requestedTaskId)
+    $openTaskId.set(null)
+  }, [requestedTaskId])
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {

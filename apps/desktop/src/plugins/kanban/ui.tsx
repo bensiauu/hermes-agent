@@ -32,6 +32,11 @@ export { columnHelp, columnLabel, type KanbanText, lockedReason, useKanban } fro
  *  persisted, so a remount can't reopen a dialog the user already dismissed. */
 export const $newTaskLane = atom<null | string>(null)
 
+/** One-shot "open this task in the drawer" request — the worker status panel
+ *  sets it and navigates to /kanban; the board page picks it up and calls
+ *  setOpenId. Same ephemeral pattern as $newTaskLane. */
+export const $openTaskId = atom<null | string>(null)
+
 /** Orchestration knobs (cached app-wide; the settings panel invalidates). */
 export function useOrchestration() {
   const scope = useKanbanScope()
@@ -91,8 +96,12 @@ export function duration(start?: null | number, end?: null | number): null | str
 
 // ── liveness ─────────────────────────────────────────────────────────────────
 
+/** True when the last heartbeat is older than 120s — the worker may have died. */
+export const heartbeatStale = (lastHeartbeatAt?: null | number): boolean =>
+  lastHeartbeatAt ? Date.now() / 1000 - lastHeartbeatAt > 120 : false
+
 /** Live elapsed label ("34s", "2m") that keeps ticking while mounted. */
-function useTicking(start?: null | number): null | string {
+export function useTicking(start?: null | number): null | string {
   const [, force] = useState(0)
 
   useEffect(() => {
@@ -125,11 +134,7 @@ export type ArcState = 'queued' | 'running' | 'stale'
  */
 export function arcState(task: KanbanTask, fallbackAssignee: string): ArcState | null {
   if (task.status === 'running') {
-    // No heartbeat for 2+ min = the worker may have died; the dispatcher will
-    // reclaim it, but be honest instead of sweeping green forever.
-    const stale = task.last_heartbeat_at ? Date.now() / 1000 - task.last_heartbeat_at > 120 : false
-
-    return stale ? 'stale' : 'running'
+    return heartbeatStale(task.last_heartbeat_at) ? 'stale' : 'running'
   }
 
   const queued =

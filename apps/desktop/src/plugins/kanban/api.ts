@@ -30,6 +30,7 @@ import {
 // Native completion notification.
 import { bindCompletionNotify, type CompletionEvent, onKanbanEventsFrame } from './completion-notify'
 import type {
+  ActiveWorkersResponse,
   BoardExportResult,
   BoardImportResult,
   BoardMeta,
@@ -203,6 +204,8 @@ function onEventsFrame(scope: string, slug: string, data: unknown, selectedSlug 
   void queryClient.invalidateQueries({ queryKey: boardKeyPrefix(scope) })
   // Any event can change a board's card count — keep the switcher badge honest.
   void queryClient.invalidateQueries({ queryKey: boardsKey(scope) })
+  // Worker status may have changed (heartbeat, claim, completion).
+  void queryClient.invalidateQueries({ queryKey: ['kanban', 'workers', scope] })
 
   for (const taskId of new Set(events.map(event => event.task_id).filter(Boolean))) {
     void queryClient.invalidateQueries({ queryKey: taskKey(scope, slug, taskId!) })
@@ -421,6 +424,7 @@ export const logKey = (scope: string, slug: string, id: string) => ['kanban', 'l
 export const boardsKey = (scope: string) => ['kanban', 'boards', scope] as const
 export const profilesKey = (scope: string) => ['kanban', 'profiles', scope] as const
 export const projectsKey = (scope: string) => ['kanban', 'projects', scope] as const
+export const workersKey = (scope: string, slug: string) => ['kanban', 'workers', scope, slug] as const
 export const orchestrationKey = (scope: string) => ['kanban', 'orchestration', scope] as const
 
 // ── reads ─────────────────────────────────────────────────────────────────────
@@ -444,6 +448,8 @@ export const fetchProfiles = () => call<{ profiles: KanbanProfile[] }>('/profile
 
 /** First-class Hermes projects, for scoping a board's default workspace. */
 export const fetchProjects = () => call<{ projects: KanbanProject[] }>('/projects')
+
+export const fetchActiveWorkers = () => call<ActiveWorkersResponse>(withBoard('/workers/active'))
 
 export const fetchOrchestration = () => call<OrchestrationSettings>('/orchestration')
 

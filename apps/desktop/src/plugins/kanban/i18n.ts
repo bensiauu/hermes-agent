@@ -14,7 +14,7 @@ type KanbanMessages = {
   /** Command label — shows in the ⌘K palette AND as the keybind panel row,
    *  so it carries the "Kanban: " prefix the palette convention wants. */
   newTaskCommand: string
-  countTip: (running: number, ready: number) => string
+  countTip: (running: number, ready: number, needsInput: number) => string
   col: Record<
     'archived' | 'blocked' | 'done' | 'ready' | 'review' | 'running' | 'scheduled' | 'todo' | 'triage',
     { label: string; help: string }
@@ -168,6 +168,16 @@ type KanbanMessages = {
   copiedTitle: string
   close: string
   working: string
+  // worker status panel
+  workersPanelTitle: string
+  workersLoading: string
+  noWorkersYet: (ready: number) => string
+  needsInputSection: (n: number) => string
+  latestActivity: string
+  noActivityYet: string
+  elapsed: string
+  eventKind: (kind: string) => string
+  openTaskLabel: (title: string) => string
   // board switcher
   board: string
   newBoard: string
@@ -233,7 +243,8 @@ export const en: KanbanMessages = {
   nav: 'Kanban',
   openBoard: 'Kanban: Open board',
   newTaskCommand: 'Kanban: New task',
-  countTip: (running, ready) => `Kanban — ${running} running, ${ready} ready`,
+  countTip: (running, ready, needsInput) =>
+    `Kanban — ${running} running, ${ready} ready${needsInput ? `, ${needsInput} needs input` : ''}`,
   col: {
     triage: { label: 'Triage', help: 'Raw ideas — a specifier fleshes out the spec.' },
     todo: { label: 'Todo', help: 'Waiting on dependencies, or unassigned.' },
@@ -408,6 +419,22 @@ export const en: KanbanMessages = {
   copiedTitle: 'Copied title',
   close: 'Close',
   working: 'working',
+  workersPanelTitle: 'Active workers',
+  workersLoading: 'Loading workers…',
+  noWorkersYet: ready => (ready ? `${ready} ready, none running yet` : 'No active workers'),
+  needsInputSection: n => `Needs input · ${n}`,
+  latestActivity: 'Latest activity',
+  noActivityYet: 'no activity yet',
+  elapsed: 'Elapsed',
+  eventKind: kind =>
+    kind === 'heartbeat'
+      ? 'heartbeat'
+      : kind === 'commented'
+        ? 'comment'
+        : kind === 'worker_registered'
+          ? 'worker started'
+          : kind,
+  openTaskLabel: title => `Open task: ${title}`,
   board: 'Board',
   newBoard: 'New board',
   switchBoard: 'Switch board',
@@ -465,7 +492,8 @@ const ja: KanbanMessages = {
   nav: 'カンバン',
   openBoard: 'カンバン: ボードを開く',
   newTaskCommand: 'カンバン: 新しいタスク',
-  countTip: (running, ready) => `カンバン — 実行中 ${running}、待機 ${ready}`,
+  countTip: (running, ready, needsInput) =>
+    `カンバン — 実行中 ${running}、待機 ${ready}${needsInput ? `、入力待ち ${needsInput}` : ''}`,
   col: {
     triage: { label: 'トリアージ', help: '生のアイデア — スペシファイアが仕様に整えます。' },
     todo: { label: 'Todo', help: '依存関係の待ち、または未割り当て。' },
@@ -639,6 +667,22 @@ const ja: KanbanMessages = {
   copiedTitle: 'タイトルをコピーしました',
   close: '閉じる',
   working: '作業中',
+  workersPanelTitle: 'アクティブなワーカー',
+  workersLoading: 'ワーカーを読み込み中…',
+  noWorkersYet: ready => (ready ? `待機 ${ready}、まだ実行なし` : 'アクティブなワーカーはありません'),
+  needsInputSection: n => `入力待ち・${n}`,
+  latestActivity: '最新のアクティビティ',
+  noActivityYet: 'まだアクティビティなし',
+  elapsed: '経過時間',
+  eventKind: kind =>
+    kind === 'heartbeat'
+      ? 'ハートビート'
+      : kind === 'commented'
+        ? 'コメント'
+        : kind === 'worker_registered'
+          ? 'ワーカー開始'
+          : kind,
+  openTaskLabel: title => `タスクを開く: ${title}`,
   board: 'ボード',
   newBoard: '新しいボード',
   switchBoard: 'ボードを切り替え',
@@ -696,7 +740,8 @@ const zh: KanbanMessages = {
   nav: '看板',
   openBoard: '看板：打开面板',
   newTaskCommand: '看板：新建任务',
-  countTip: (running, ready) => `看板 — 运行中 ${running}、就绪 ${ready}`,
+  countTip: (running, ready, needsInput) =>
+    `看板 — 运行中 ${running}、就绪 ${ready}${needsInput ? `、等待输入 ${needsInput}` : ''}`,
   col: {
     triage: { label: '分诊', help: '原始想法 — 由细化代理整理出规格。' },
     todo: { label: '待办', help: '等待依赖，或未分配。' },
@@ -868,6 +913,22 @@ const zh: KanbanMessages = {
   copiedTitle: '已复制标题',
   close: '关闭',
   working: '进行中',
+  workersPanelTitle: '活跃工作单元',
+  workersLoading: '正在加载工作单元…',
+  noWorkersYet: ready => (ready ? `待机 ${ready}，尚无运行` : '当前没有活跃工作单元'),
+  needsInputSection: n => `等待输入・${n}`,
+  latestActivity: '最新活动',
+  noActivityYet: '暂无活动。',
+  elapsed: '已运行',
+  eventKind: kind =>
+    kind === 'heartbeat'
+      ? '心跳'
+      : kind === 'commented'
+        ? '评论'
+        : kind === 'worker_registered'
+          ? '工作单元启动'
+          : kind,
+  openTaskLabel: title => `打开任务: ${title}`,
   board: '面板',
   newBoard: '新建面板',
   switchBoard: '切换面板',
@@ -924,7 +985,8 @@ const zhHant: KanbanMessages = {
   nav: '看板',
   openBoard: '看板：開啟面板',
   newTaskCommand: '看板：新增任務',
-  countTip: (running, ready) => `看板 — 執行中 ${running}、就緒 ${ready}`,
+  countTip: (running, ready, needsInput) =>
+    `看板 — 執行中 ${running}、就緒 ${ready}${needsInput ? `、等待輸入 ${needsInput}` : ''}`,
   col: {
     triage: { label: '分類', help: '原始想法 — 由細化代理整理出規格。' },
     todo: { label: '待辦', help: '等待相依項目，或未指派。' },
@@ -1096,6 +1158,22 @@ const zhHant: KanbanMessages = {
   copiedTitle: '已複製標題',
   close: '關閉',
   working: '進行中',
+  workersPanelTitle: '活躍工作單元',
+  workersLoading: '正在載入工作單元…',
+  noWorkersYet: ready => (ready ? `待機 ${ready}，尚無執行` : '目前沒有活躍工作單元'),
+  needsInputSection: n => `等待輸入・${n}`,
+  latestActivity: '最新活動',
+  noActivityYet: '尚無活動。',
+  elapsed: '已執行',
+  eventKind: kind =>
+    kind === 'heartbeat'
+      ? '心跳'
+      : kind === 'commented'
+        ? '留言'
+        : kind === 'worker_registered'
+          ? '工作單元啟動'
+          : kind,
+  openTaskLabel: title => `開啟任務: ${title}`,
   board: '面板',
   newBoard: '新增面板',
   switchBoard: '切換面板',

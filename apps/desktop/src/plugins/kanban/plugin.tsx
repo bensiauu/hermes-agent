@@ -20,30 +20,38 @@ import {
   KEYBINDS_AREA,
   PALETTE_AREA,
   type PaletteContribution,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   type RouteContribution,
   ROUTES_AREA,
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
   STATUSBAR_AREAS,
-  Tip,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
   useQuery,
   useValue
 } from '@hermes/plugin-sdk'
+import { useState } from 'react'
 
 import { $boardSlug, bindApi, boardKey, fetchBoard, useKanbanScope } from './api'
 import { KanbanBoardPage } from './board'
 import { KANBAN_LOCALES } from './i18n'
 import { $newTaskLane, useKanban } from './ui'
+import { WorkerStatusPanel } from './worker-status'
 
-// Live "N running / ready" pill — one glance at fleet activity from anywhere,
-// clicks through to the board. Shares the board query (one cache, one poll with
-// the page); hidden when nothing is in flight (or unloaded).
-function KanbanCount() {
+// Live "N running / ready" pill with a worker-status popover — one glance at
+// fleet activity from anywhere. Shares the board query (one cache, one poll
+// with the page); hidden when nothing is in flight (or unloaded).
+export function KanbanCount() {
   const k = useKanban()
   const scope = useKanbanScope()
   const slug = useValue($boardSlug)
+  const [open, setOpen] = useState(false)
 
-  // Socket-invalidated like the page (same cache); slow socketless heartbeat.
   const { data: board } = useQuery({
     queryFn: () => fetchBoard(false),
     queryKey: boardKey(scope, slug, false),
@@ -55,26 +63,60 @@ function KanbanCount() {
   }
 
   const count = (name: string) => board.columns.find(col => col.name === name)?.tasks.length ?? 0
-  const active = count('running') + count('ready')
+  const running = count('running')
+  const ready = count('ready')
 
-  if (active === 0) {
+  const needsInput =
+    board.columns.find(c => c.name === 'blocked')?.tasks.filter(t => t.block_kind === 'needs_input').length ?? 0
+
+  const active = running + ready
+
+  if (active === 0 && needsInput === 0) {
     return null
   }
 
-  return (
-    <Tip label={k.countTip(count('running'), count('ready'))}>
+  const trigger = (
+    <PopoverTrigger asChild>
       <button
+        aria-label={k.countTip(running, ready, needsInput)}
         className={cn(
           'inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem] tabular-nums transition-colors',
           'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground'
         )}
-        onClick={() => host.navigate('/kanban')}
         type="button"
       >
         <Codicon name="project" size="0.7rem" />
         <span>{active}</span>
+        {needsInput > 0 && (
+          <>
+            <span className="text-(--ui-text-quaternary)">·</span>
+            <span className="inline-flex items-center gap-0.5 text-destructive">
+              <Codicon name="debug-breakpoint-data-unverified" size="0.65rem" />
+              {needsInput}
+            </span>
+          </>
+        )}
       </button>
-    </Tip>
+    </PopoverTrigger>
+  )
+
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+          <TooltipContent side="top">{k.countTip(running, ready, needsInput)}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent
+        align="end"
+        aria-label={k.workersPanelTitle}
+        side="top"
+        variant="menu"
+      >
+        <WorkerStatusPanel board={board} open={open} scope={scope} slug={slug} />
+      </PopoverContent>
+    </Popover>
   )
 }
 
